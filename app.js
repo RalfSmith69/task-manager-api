@@ -1,3 +1,4 @@
+// app.js
 const express = require('express');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
@@ -27,11 +28,11 @@ mongoose.connect(process.env.MONGO_URI, {
 
 // Routen einbinden
 const authRoutes = require('./routes/auth');
-const projectRoutes = require('./routes/projects');
+const projectRoutes = require('./routes/projects'); // Hier wird die Route für Projekte eingebunden
 const taskRoutes = require('./routes/tasks');
 
 app.use('/api/auth', authRoutes);
-app.use('/api/projects', projectRoutes);
+app.use('/api/projects', projectRoutes); // Überprüfe, ob diese Zeile vorhanden ist
 app.use('/api/tasks', taskRoutes);
 
 // Basis-Route für den Test der API
