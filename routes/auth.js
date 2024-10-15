@@ -1,69 +1,102 @@
+// routes/tasks.js
 const express = require('express');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { body, validationResult } = require('express-validator');
-const User = require('../models/User');
+const Task = require('../models/Task');
+const Project = require('../models/Project');
+const auth = require('../middleware/auth'); // Middleware importieren
 
 const router = express.Router();
 
-// Benutzerregistrierung
-router.post('/register', [
-  body('name').notEmpty().withMessage('Name ist erforderlich'),
-  body('email').isEmail().withMessage('Gültige E-Mail-Adresse erforderlich'),
-  body('password').isLength({ min: 6 }).withMessage('Passwort muss mindestens 6 Zeichen lang sein')
-], async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
+// Erstellen einer neuen Aufgabe (nur für authentifizierte Benutzer)
+router.post('/:projectId', auth, async (req, res) => {
+  const { title, description, status } = req.body;
+  const { projectId } = req.params;
 
-  const { name, email, password } = req.body;
   try {
-    let user = await User.findOne({ email });
-    if (user) {
-      return res.status(400).json({ msg: 'Benutzer existiert bereits' });
+    // Prüfen, ob das Projekt existiert
+    const project = await Project.findById(projectId);
+    if (!project) {
+      return res.status(404).json({ message: 'Projekt nicht gefunden' });
     }
 
-    user = new User({ name, email, password });
-    await user.save();
+    // Neue Aufgabe erstellen
+    const task = new Task({
+      title,
+      description,
+      status,
+      project: projectId
+    });
 
-    const payload = { userId: user._id };
-    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
+    // Logge die Aufgabe zur Überprüfung
+    console.log("Neue Aufgabe:", task);
 
-    res.status(201).json({ token });
-  } catch (err) {
-    res.status(500).send('Serverfehler');
+    // Aufgabe speichern
+    await task.save();
+
+    // Aufgabe dem Projekt hinzufügen
+    project.tasks.push(task._id);
+    await project.save();
+
+    // Rückgabe der erstellten Aufgabe
+    res.status(201).json(task);
+  } catch (error) {
+    console.error("Fehler beim Erstellen der Aufgabe:", error);
+    res.status(500).json({ message: 'Serverfehler' });
   }
 });
 
-// Benutzerlogin
-router.post('/login', [
-  body('email').isEmail().withMessage('Gültige E-Mail-Adresse erforderlich'),
-  body('password').exists().withMessage('Passwort ist erforderlich')
-], async (req, res) =>  {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
+// Alle Aufgaben eines Projekts abrufen (nur für authentifizierte Benutzer)
+router.get('/:projectId', auth, async (req, res) => {
+  const { projectId } = req.params;
 
-  const { email, password } = req.body;
   try {
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({ msg: 'Ungültige Anmeldeinformationen' });
+    const tasks = await Task.find({ project: projectId });
+    if (!tasks.length) {
+      return res.status(404).json({ message: 'Keine Aufgaben gefunden' });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ msg: 'Ungültige Anmeldeinformationen' });
+    res.json(tasks);
+  } catch (error) {
+    console.error("Fehler beim Abrufen der Aufgaben:", error);
+    res.status(500).json({ message: 'Serverfehler' });
+  }
+});
+
+// Aufgabe aktualisieren (nur für authentifizierte Benutzer)
+router.put('/:id', auth, async (req, res) => {
+  const { title, description, status } = req.body;
+
+  try {
+    const task = await Task.findById(req.params.id);
+    if (!task) {
+      return res.status(404).json({ message: 'Aufgabe nicht gefunden' });
     }
 
-    const payload = { userId: user._id };
-    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
+    task.title = title || task.title;
+    task.description = description || task.description;
+    task.status = status || task.status;
 
-    res.json({ token });
-  } catch (err) {
-    res.status(500).send('Serverfehler');
+    // Aufgabe speichern
+    await task.save();
+
+    res.json(task);
+  } catch (error) {
+    console.error("Fehler beim Aktualisieren der Aufgabe:", error);
+    res.status(500).json({ message: 'Serverfehler' });
+  }
+});
+
+// Aufgabe löschen (nur für authentifizierte Benutzer)
+router.delete('/:id', auth, async (req, res) => {
+  try {
+    const task = await Task.findByIdAndDelete(req.params.id);
+    if (!task) {
+      return res.status(404).json({ message: 'Aufgabe nicht gefunden' });
+    }
+
+    res.json({ message: 'Aufgabe gelöscht' });
+  } catch (error) {
+    console.error("Fehler beim Löschen der Aufgabe:", error);
+    res.status(500).json({ message: 'Serverfehler' });
   }
 });
 
