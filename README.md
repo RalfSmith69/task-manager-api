@@ -43,3 +43,5 @@ Eine RESTful API für eine Task-Management-Anwendung, entwickelt mit Node.js, Ex
 - Hinzufügen von Paginierung für Projekt- und Aufgabenlisten
 - Erweiterte Suchfunktionen für Aufgaben
 - Implementierung von Benutzerrollen und Berechtigungen
+
+ https://ralfsmith69.github.io/task-manager-api/
